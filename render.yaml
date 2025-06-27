@@ -1,0 +1,16 @@
+
+services:
+  - type: web
+    name: avispero-app
+    env: java
+    repo: https://github.com/Jazjmjk/Avispero
+    buildCommand: ./mvnw clean install
+    startCommand: java -jar target/*.jar
+    envVars:
+      - key: JAVA_VERSION
+        value: 17
+
+
+
+^O 
+
