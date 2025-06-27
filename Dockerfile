@@ -1,20 +1,22 @@
-# Etapa 1: Build (opcional si ya tienes el .jar)
-# FROM eclipse-temurin:17-jdk-alpine as builder
-# WORKDIR /app
-# COPY . .
-# RUN ./mvnw clean package -DskipTests
+# Etapa 1: Construcción del .jar
+FROM eclipse-temurin:17-jdk-alpine AS build
+
+WORKDIR /app
+
+# Copia el código fuente
+COPY . .
+
+# Instala Maven y genera el .jar (salida en /app/target/)
+RUN ./mvnw clean package -DskipTests
 
 # Etapa 2: Imagen final
 FROM eclipse-temurin:17-jdk-alpine
 
-# Crea un directorio dentro del contenedor
 WORKDIR /app
 
-# Copia el .jar generado en tu máquina local (carpeta target/) al contenedor
-COPY target/*.jar app.jar
+# Copia el .jar desde la etapa anterior
+COPY --from=build /app/target/*.jar app.jar
 
-# Expone el puerto de tu app (por defecto 8080 o el que uses)
-EXPOSE 8081
+EXPOSE 8080
 
-# Ejecuta la app
 ENTRYPOINT ["java", "-jar", "app.jar"]
