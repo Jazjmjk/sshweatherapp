@@ -29,35 +29,39 @@ public class WeatherController {
     private ObjectMapper objectMapper;
 
     @GetMapping("/")
-    public String showPrincipal(Model model) throws Exception {
-        WeatherData ultimo = sshService.getUltimoDato();
-        model.addAttribute("ultimo", ultimo);
+    public String showPrincipal(Model model) {
+        try {
+            WeatherData ultimo = sshService.getUltimoDato();
+            model.addAttribute("ultimo", ultimo);
+            model.addAttribute("aqiTexto", sshService.convertirAqiATexto(ultimo.getAqi()));
 
-        model.addAttribute("aqiTexto", sshService.convertirAqiATexto(ultimo.getAqi()));
+            List<WeatherData> datosMes = sshService.getDatosMesActual();
+            model.addAttribute("datosMes", datosMes);
 
-        List<WeatherData> datosMes = sshService.getDatosMesActual();
-        model.addAttribute("datosMes", datosMes);
+            String datosMesJson = objectMapper.writeValueAsString(datosMes).replaceAll("</", "<\\/");
+            model.addAttribute("datosMesJson", datosMesJson);
 
-        String datosMesJson = objectMapper.writeValueAsString(datosMes).replaceAll("</", "<\\/");
-        model.addAttribute("datosMesJson", datosMesJson);
-
-        if (!datosMes.isEmpty()) {
-            model.addAttribute("fechaMin", datosMes.get(0).getFecha());
-            model.addAttribute("fechaMax", datosMes.get(datosMes.size() - 1).getFecha());
-        }
-
-        boolean activo = false;
-        if (ultimo.getFecha() != null && ultimo.getHora() != null) {
-            try {
-                String fechaHoraStr = ultimo.getFecha() + " " + ultimo.getHora();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yy HH:mm");
-                LocalDateTime fechaHoraDato = LocalDateTime.parse(fechaHoraStr, formatter);
-                activo = fechaHoraDato.isAfter(LocalDateTime.now().minusMinutes(30));
-            } catch (Exception e) {
-                activo = false;
+            if (!datosMes.isEmpty()) {
+                model.addAttribute("fechaMin", datosMes.get(0).getFecha());
+                model.addAttribute("fechaMax", datosMes.get(datosMes.size() - 1).getFecha());
             }
+
+            boolean activo = false;
+            if (ultimo.getFecha() != null && ultimo.getHora() != null) {
+                try {
+                    String fechaHoraStr = ultimo.getFecha() + " " + ultimo.getHora();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yy HH:mm");
+                    LocalDateTime fechaHoraDato = LocalDateTime.parse(fechaHoraStr, formatter);
+                    activo = fechaHoraDato.isAfter(LocalDateTime.now().minusMinutes(30));
+                } catch (Exception e) {
+                    activo = false;
+                }
+            }
+            model.addAttribute("activo", activo);
+
+        } catch (Exception e) {
+            model.addAttribute("error", "Error al cargar los datos: " + e.getMessage());
         }
-        model.addAttribute("activo", activo);
 
         return "principal";
     }

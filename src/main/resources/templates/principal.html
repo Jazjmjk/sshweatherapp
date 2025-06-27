@@ -982,6 +982,9 @@
             <canvas id="graficaAQI"></canvas>
         </div>
     </div>
+    <div th:if="${error}" style="color: red; font-weight: bold;">
+        <p th:text="${error}"></p>
+    </div>
     <script th:inline="javascript">
         const datosMes = JSON.parse(/*[[${datosMesJson}]]*/ '[]');
     </script>
