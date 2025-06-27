@@ -8,6 +8,3 @@ services:
     envVars:
       - key: JAVA_VERSION
         value: 17
-
-
-
