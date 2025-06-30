@@ -621,33 +621,63 @@
                 }, 5000);
             }
         }
-        function iniciarDescarga() {
-            showDownloadNotification(true);
+    function iniciarDescarga(event) {
+        event.preventDefault();
 
-            const csvData = [
-                'Fecha,Hora,Temperatura,Humedad,Presion,Velocidad_Viento,AQI',
-                '2024-06-26,10:00,27.5,65,957,8.2,45',
-                '2024-06-26,11:00,28.1,63,956,9.1,48',
-                '2024-06-26,12:00,29.2,60,955,10.5,52'
-            ];
+        showDownloadNotification(true);
 
-            setTimeout(() => {
-                const csvContent = csvData.join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv' });
+        const fechaInicio = document.getElementById("fechaInicio").value;
+        const fechaFin = document.getElementById("fechaFin").value;
+        const hoy = new Date();
+        const minFecha = new Date(hoy.getFullYear(), hoy.getMonth(), 24);
+        const inicio = new Date(fechaInicio);
+        const fin = new Date(fechaFin);
+
+        if (inicio < minFecha) {
+            showDownloadNotification(false);
+            alert("No hay datos disponibles para la fecha " + fechaInicio + ". El primer dato disponible es del 25.");
+            return;
+        }
+
+        if (inicio > fin) {
+            showDownloadNotification(false);
+            alert("La fecha de inicio no puede ser mayor que la de fin.");
+            return;
+        }
+
+        fetch(`/descargarCSV?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Error al descargar el archivo");
+                }
+                return response.blob();
+            })
+            .then(blob => {
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
+                const a = document.createElement("a");
                 a.href = url;
-                a.download = 'datos_climaticos.csv';
+                a.download = "datos_estacion.csv";
+                document.body.appendChild(a);
                 a.click();
+                a.remove();
                 URL.revokeObjectURL(url);
 
                 showDownloadNotification(false);
-            }, 2000);
+                cerrarModal("modalDescargar");
+            })
+            .catch(error => {
+                console.error("Error al descargar CSV:", error);
+                showDownloadNotification(false);
+                alert("No se pudo descargar el archivo CSV.");
+            });
+    }
 
-            cerrarModal('modalDescargar');
-        }
+    function cerrarModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
 
-        function initMap() {
+
+    function initMap() {
             if (window.mapInitialized) return;
 
             const tuxtlaCoords = [16.7533, -93.1132];
@@ -658,69 +688,75 @@
                 attribution: ''
             }).addTo(map);
 
-            const estaciones = [
-                {
-                    nombre: "FCFM",
-                    coords: [16.6946, -93.1861],
-                    activa: true,
-                    temperatura: "27°C",
-                    presion: "957 hPa",
-                    descripcion: "Estación meteorológica  del Sistema Avispero"
-                },
-                {
-                    nombre: "Nueva Estación",
-                    coords: [16.7400, -93.1000],
-                    activa: false,
-                    temperatura: "--",
-                    presion: "--",
-                    descripcion: "Estación en proceso de implementación"
-                },
+            fetch("/api/estacion")
+                .then(res => res.json())
+                .then(data => {
+                    const estaciones = [
+                        {
+                            nombre: "FCFM",
+                            coords: [16.6946, -93.1861],
+                            activa: data.activo,
+                            temperatura: `${data.temperatura.toFixed(1)}°C`,
+                            presion: `${data.presion.toFixed(1)} hPa`,
+                            Humedad:`Humedad: ${data.humedad.toFixed(1)}%`,
+                            AQI: `${data.aqi}`,
+                            Viento: `${data.viento.toFixed(1)} m/s`,
+                            descripcion: `"Estación del Sistema Meteorológico Avispero"`
+                        },
+                        {
+                            nombre: "Nueva Estación",
+                            coords: [16.7400, -93.1000],
+                            activa: false,
+                            temperatura: "--",
+                            presion: "--",
+                            descripcion: "Estación en proceso de implementación"
+                        }
+                    ];
 
-            ];
+                    estaciones.forEach(estacion => {
+                        const icon = L.divIcon({
+                            html: `<div style="background-color: ${estacion.activa ? '#28a745' : '#dc3545'};
+                                  width: 20px; height: 20px; border-radius: 50%;
+                                  border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+                            iconSize: [20, 20],
+                            className: 'custom-div-icon'
+                        });
 
-            estaciones.forEach(estacion => {
-                const icon = L.divIcon({
-                    html: `<div style="background-color: ${estacion.activa ? '#28a745' : '#dc3545'};
-                                      width: 20px; height: 20px; border-radius: 50%;
-                                      border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
-                    iconSize: [20, 20],
-                    className: 'custom-div-icon'
+                        const marker = L.marker(estacion.coords, { icon: icon }).addTo(map);
+
+                        const popupContent = `
+                <div style="min-width: 200px;">
+                    <h3 style="margin: 0 0 10px 0; color: #155fa0;">${estacion.nombre}</h3>
+                    <p style="margin: 5px 0;"><strong>Estado:</strong>
+                       <span style="color: ${estacion.activa ? '#28a745' : '#dc3545'};">
+                          ${estacion.activa ? 'Activa' : 'Inactiva'}
+                       </span>
+                    </p>
+                    <p style="margin: 5px 0;"><strong>Temperatura:</strong> ${estacion.temperatura}</p>
+                    <p style="margin: 5px 0;"><strong>Presión:</strong> ${estacion.presion}</p>
+                    <p style="margin: 5px 0; font-size: 12px; color: #666;">${estacion.descripcion}</p>
+                </div>
+            `;
+
+                        marker.bindPopup(popupContent);
+                    });
+
+                    const cityIcon = L.divIcon({
+                        html: '🏛️',
+                        iconSize: [30, 30],
+                        className: 'city-icon'
+                    });
+
+                    L.marker([16.7533, -93.1132], { icon: cityIcon }).addTo(map)
+                        .bindPopup('<h3>Tuxtla Gutiérrez</h3><p>Capital del estado de Chiapas</p>');
+
+                    window.mapInitialized = true;
+                })
+                .catch(error => {
+                    console.error("Error al cargar datos de estaciones:", error);
                 });
 
-                const marker = L.marker(estacion.coords, { icon: icon }).addTo(map);
-
-                const popupContent = `
-                    <div style="min-width: 200px;">
-                        <h3 style="margin: 0 0 10px 0; color: #155fa0;">${estacion.nombre}</h3>
-                        <p style="margin: 5px 0;"><strong>Estado:</strong>
-                           <span style="color: ${estacion.activa ? '#28a745' : '#dc3545'};">
-                              ${estacion.activa ? 'Activa' : 'Inactiva'}
-                           </span>
-                        </p>
-                        <p style="margin: 5px 0;"><strong>Temperatura:</strong> ${estacion.temperatura}</p>
-                        <p style="margin: 5px 0;"><strong>Presión:</strong> ${estacion.presion}</p>
-                        <p style="margin: 5px 0; font-size: 12px; color: #666;">${estacion.descripcion}</p>
-                    </div>
-                `;
-
-                marker.bindPopup(popupContent);
-            });
-
-            const cityIcon = L.divIcon({
-                html: '🏛️',
-                iconSize: [30, 30],
-                className: 'city-icon'
-            });
-
-            L.marker(tuxtlaCoords, { icon: cityIcon }).addTo(map)
-                .bindPopup('<h3>Tuxtla Gutiérrez</h3><p>Capital del estado de Chiapas</p>');
-
-            window.mapInitialized = true;
         }
-
-        window.onload = function () {
-            document.getElementById("defaultTab").click();
-        };
     </script>
 </head>
 <body>
@@ -749,7 +785,7 @@
     <div id="Inicio" class="tab-content">
         <div class="panel">
             <h2>TUXTLA GUTIÉRREZ</h2>
-            <div class="fecha"><span th:text="${ultimo.fecha}">2025-06-19</span></div>
+            <div class="fecha"><span th:text="${ultimo.fecha}">19-06-2025</span></div>
             <div class="hora"><span th:text="${ultimo.hora}">14:45</span></div>
             <div class="main-weather">
                 ☀️ <span th:text="${#numbers.formatDecimal(ultimo.temperatura, 0, 0)}">27</span>° C
@@ -784,7 +820,7 @@
                      th:classappend="${activo} ? 'status-activa' : 'status-inactiva'">
                     ● Activa
                 </div>
-                <div class="fecha"><span th:text="${ultimo.fecha}">2025-06-19</span></div>
+                <div class="fecha"><span th:text="${ultimo.fecha}">19-06-2025</span></div>
                 <div class="hora"><span th:text="${ultimo.hora}">14:45</span></div>
                 <div class="main-weather">
                     🌤️ <span th:text="${#numbers.formatDecimal(ultimo.temperatura, 0, 0)}">27</span>° C
@@ -952,21 +988,21 @@
     </div>
 </footer>
 
-<div id="modalDescargar">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Descargar Datos CSV</h3>
-            <button class="close-btn" aria-label="Cerrar" onclick="cerrarModal('modalDescargar')">×</button>
+    <div id="modalDescargar">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Descargar Datos CSV</h3>
+                <button class="close-btn" aria-label="Cerrar" onclick="cerrarModal('modalDescargar')">×</button>
+            </div>
+            <form onsubmit="iniciarDescarga(event)">
+                <label>Desde:</label><br>
+                <input type="date" id="fechaInicio" name="fechaInicio" required><br><br>
+                <label>Hasta:</label><br>
+                <input type="date" id="fechaFin" name="fechaFin" required><br><br>
+                <button class="btn" type="submit">Descargar</button>
+                <button type="button" class="btn" onclick="cerrarModal('modalDescargar')" style="background-color: #888; margin-left: 10px;">Cancelar</button>
+            </form>
         </div>
-        <form th:action="@{/descargarCSV}" method="get" onsubmit="iniciarDescarga(); return true;">
-            <label>Desde:</label><br>
-            <input type="date" name="fechaInicio" required><br><br>
-            <label>Hasta:</label><br>
-            <input type="date" name="fechaFin" required><br><br>
-            <button class="btn" type="submit">Descargar</button>
-            <button type="button" class="btn" onclick="cerrarModal('modalDescargar')" style="background-color: #888; margin-left: 10px;">Cancelar</button>
-        </form>
-    </div>
 </div>
 
     <div id="modalReporte">
@@ -1045,5 +1081,10 @@
     </script>
 
 </main>
+<script>
+    window.addEventListener("load", function () {
+        document.getElementById("defaultTab").click();
+    });
+</script>
 </body>
 </html>

@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -74,41 +75,45 @@ public class SshService {
             session.connect();
 
             channel = (ChannelExec) session.openChannel("exec");
-            String cmdArchivo = "ls " + remoteFile + "/*.csv | sort -V | tail -n 1";
+            String cmdArchivo = "ls " + remoteFile + "/*.csv | sort -V";
             channel.setCommand(cmdArchivo);
             InputStream in = channel.getInputStream();
             channel.connect();
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-            String archivoReciente = reader.readLine();
+            List<String> archivos = new ArrayList<>();
+            String linea;
+            while ((linea = reader.readLine()) != null) {
+                archivos.add(linea.trim());
+            }
             channel.disconnect();
 
-            if (archivoReciente == null || archivoReciente.isEmpty()) {
-                System.err.println("No se encontró archivo CSV reciente en: " + remoteFile);
-                return dato;
-            }
+            Collections.reverse(archivos);
+            for (String archivoReciente : archivos) {
+                channel = (ChannelExec) session.openChannel("exec");
+                String cmdTail = "tail -n 1 " + archivoReciente;
+                channel.setCommand(cmdTail);
+                InputStream in2 = channel.getInputStream();
+                channel.connect();
 
-            channel = (ChannelExec) session.openChannel("exec");
-            String cmdTail = "tail -n 1 " + archivoReciente;
-            channel.setCommand(cmdTail);
-            InputStream in2 = channel.getInputStream();
-            channel.connect();
+                BufferedReader reader2 = new BufferedReader(new InputStreamReader(in2));
+                String ultimaLinea = reader2.readLine();
+                channel.disconnect();
 
-            BufferedReader reader2 = new BufferedReader(new InputStreamReader(in2));
-            String linea = reader2.readLine();
-
-            if (linea != null && !linea.startsWith("DATE")) {
-                String[] partes = linea.trim().split(",");
-                if (partes.length >= 7) {
-                    String horaAjustada = ajustarHora(partes[1]);
-                    if (esCada15Minutos(horaAjustada)) {
-                        dato.setFecha(partes[0]);
-                        dato.setHora(horaAjustada);
-                        dato.setTemperatura(Double.parseDouble(partes[2]));
-                        dato.setPresion(Double.parseDouble(partes[3]));
-                        dato.setHumedad(Double.parseDouble(partes[4]));
-                        dato.setAqi(Integer.parseInt(partes[5]));
-                        dato.setViento(Double.parseDouble(partes[6]));
+                if (ultimaLinea != null && !ultimaLinea.trim().isEmpty() && !ultimaLinea.startsWith("DATE")) {
+                    String[] partes = ultimaLinea.trim().split(",");
+                    if (partes.length >= 7) {
+                        String horaAjustada = ajustarHora(partes[1]);
+                        if (esCada15Minutos(horaAjustada)) {
+                            dato.setFecha(partes[0]);
+                            dato.setHora(horaAjustada);
+                            dato.setTemperatura(Double.parseDouble(partes[2]));
+                            dato.setPresion(Double.parseDouble(partes[3]));
+                            dato.setHumedad(Double.parseDouble(partes[4]));
+                            dato.setAqi(Integer.parseInt(partes[5]));
+                            dato.setViento(Double.parseDouble(partes[6]));
+                            break;
+                        }
                     }
                 }
             }
@@ -122,7 +127,6 @@ public class SshService {
 
         return dato;
     }
-
 
     public List<WeatherData> getDatosMesActual() {
         return getDatosPorRango(LocalDate.now().withDayOfMonth(1), LocalDate.now());
@@ -202,5 +206,30 @@ public class SshService {
         }
 
         return datosRango;
+    }
+
+    public void keepAlive() {
+        Session session = null;
+        ChannelExec channel = null;
+
+        try {
+            JSch jsch = new JSch();
+            session = jsch.getSession(user, host, 22);
+            session.setPassword(password);
+            session.setConfig("StrictHostKeyChecking", "no");
+            session.connect(5000);
+
+            channel = (ChannelExec) session.openChannel("exec");
+            channel.setCommand("echo ping");
+            channel.connect(3000);
+
+            System.out.println("Ping SSH exitoso");
+
+        } catch (Exception e) {
+            System.err.println("Ping SSH falló: " + e.getMessage());
+        } finally {
+            if (channel != null && channel.isConnected()) channel.disconnect();
+            if (session != null && session.isConnected()) session.disconnect();
+        }
     }
 }

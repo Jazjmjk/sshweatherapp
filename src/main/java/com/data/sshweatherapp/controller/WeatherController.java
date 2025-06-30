@@ -8,6 +8,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,10 +18,16 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class WeatherController {
+    @Scheduled(fixedRate = 60000)
+    public void mantenerConexionSSH() {
+        sshService.keepAlive();
+    }
 
     @Autowired
     private SshService sshService;
@@ -96,4 +103,36 @@ public class WeatherController {
                 .headers(headers)
                 .body(contenido);
     }
+    @GetMapping("/api/estacion")
+    @ResponseBody
+    public Map<String, Object> obtenerUltimoDato() {
+        WeatherData dato = sshService.getUltimoDato();
+        Map<String, Object> respuesta = new HashMap<>();
+
+
+        respuesta.put("fecha", dato.getFecha());
+        respuesta.put("hora", dato.getHora());
+        respuesta.put("temperatura", dato.getTemperatura());
+        respuesta.put("presion", dato.getPresion());
+        respuesta.put("humedad", dato.getHumedad());
+        respuesta.put("aqi", dato.getAqi());
+        respuesta.put("viento", dato.getViento());
+
+        boolean activo = false;
+        if (dato.getFecha() != null && dato.getHora() != null) {
+            try {
+                String fechaHoraStr = dato.getFecha() + " " + dato.getHora();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yy HH:mm");
+                LocalDateTime fechaHoraDato = LocalDateTime.parse(fechaHoraStr, formatter);
+                activo = fechaHoraDato.isAfter(LocalDateTime.now().minusMinutes(30));
+            } catch (Exception e) {
+                activo = false;
+            }
+        }
+
+        respuesta.put("activo", activo);
+        return respuesta;
+    }
+
+
 }
