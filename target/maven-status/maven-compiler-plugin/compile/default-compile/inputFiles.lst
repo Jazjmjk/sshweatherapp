@@ -1,4 +1,5 @@
 /home/mctp/Descargas/sshweatherapp/sshweatherapp/src/main/java/com/data/sshweatherapp/SshWeatherAppApplication.java
 /home/mctp/Descargas/sshweatherapp/sshweatherapp/src/main/java/com/data/sshweatherapp/service/SshService.java
 /home/mctp/Descargas/sshweatherapp/sshweatherapp/src/main/java/com/data/sshweatherapp/model/WeatherData.java
+/home/mctp/Descargas/sshweatherapp/sshweatherapp/src/main/java/com/data/sshweatherapp/model/Estacion.java
 /home/mctp/Descargas/sshweatherapp/sshweatherapp/src/main/java/com/data/sshweatherapp/controller/WeatherController.java

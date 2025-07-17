@@ -1,4 +1,5 @@
 com/data/sshweatherapp/service/SshService.class
+com/data/sshweatherapp/model/Estacion.class
 com/data/sshweatherapp/controller/WeatherController.class
 com/data/sshweatherapp/model/WeatherData.class
 com/data/sshweatherapp/SshWeatherAppApplication.class
