@@ -673,8 +673,12 @@ public class SshService {
                     valor.equalsIgnoreCase("None") || valor.equalsIgnoreCase("null")) {
                 return 0;
             }
-            return Integer.parseInt(valor.trim());
+
+            double doubleValue = Double.parseDouble(valor.trim());
+            return (int) Math.round(doubleValue);
+
         } catch (NumberFormatException e) {
+            System.err.println("Error parseando entero: " + valor + " - " + e.getMessage());
             return 0;
         }
     }

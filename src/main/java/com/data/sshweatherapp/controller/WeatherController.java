@@ -43,13 +43,27 @@ public class WeatherController {
             System.out.println("Total de estaciones: " + todasLasEstaciones.size());
             System.out.println("Total de datos obtenidos: " + todosLosDatos.size());
 
+            // Debug: Imprimir algunos datos para verificar
+            if (todosLosDatos != null && !todosLosDatos.isEmpty()) {
+                System.out.println("Primeros datos obtenidos:");
+                for (int i = 0; i < Math.min(3, todosLosDatos.size()); i++) {
+                    WeatherData data = todosLosDatos.get(i);
+                    System.out.println("Estación: " + data.getEstacion() +
+                            ", Temp: " + data.getTemperatura() +
+                            ", Presión: " + data.getPresion() +
+                            ", Humedad: " + data.getHumedad());
+                }
+            }
+
             Map<String, List<WeatherData>> datosPorRegion = new LinkedHashMap<>();
             Map<String, String> aqiTextoMap = new HashMap<>();
 
+            // Crear mapa de datos por estación
             Map<String, WeatherData> datosMap = new HashMap<>();
             for (WeatherData data : todosLosDatos) {
                 if (data != null && data.getEstacion() != null) {
                     datosMap.put(data.getEstacion(), data);
+                    System.out.println("Mapeando estación: " + data.getEstacion() + " con temperatura: " + data.getTemperatura());
                 }
             }
 
@@ -73,31 +87,50 @@ public class WeatherController {
 
             Map<String, WeatherData> estacionesPrincipales = new LinkedHashMap<>();
 
+            // Para TGZ
             if (!estacionesTGZ.isEmpty()) {
                 String estacionPrincipalTGZ = estacionesTGZ.get(0);
                 WeatherData dato = datosMap.get(estacionPrincipalTGZ);
-                if (dato == null) {
+
+                if (dato != null) {
+                    System.out.println("Datos encontrados para TGZ: " + estacionPrincipalTGZ + " - Temp: " + dato.getTemperatura());
+                    estacionesPrincipales.put(estacionPrincipalTGZ, dato);
+                } else {
+                    System.out.println("No se encontraron datos para TGZ: " + estacionPrincipalTGZ + ", creando datos vacíos");
+                    // Solo crear datos vacíos si realmente no hay datos
                     dato = crearDatoVacio(estacionPrincipalTGZ);
+                    estacionesPrincipales.put(estacionPrincipalTGZ, dato);
                 }
-                estacionesPrincipales.put(estacionPrincipalTGZ, dato);
             }
 
+            // Para KRK
             if (!estacionesKRK.isEmpty()) {
                 String estacionPrincipalKRK = estacionesKRK.get(0);
                 WeatherData dato = datosMap.get(estacionPrincipalKRK);
-                if (dato == null) {
+
+                if (dato != null) {
+                    System.out.println("Datos encontrados para KRK: " + estacionPrincipalKRK + " - Temp: " + dato.getTemperatura());
+                    estacionesPrincipales.put(estacionPrincipalKRK, dato);
+                } else {
+                    System.out.println("No se encontraron datos para KRK: " + estacionPrincipalKRK + ", creando datos vacíos");
                     dato = crearDatoVacio(estacionPrincipalKRK);
+                    estacionesPrincipales.put(estacionPrincipalKRK, dato);
                 }
-                estacionesPrincipales.put(estacionPrincipalKRK, dato);
             }
 
+            // Para otras estaciones
             if (!estacionesOtras.isEmpty()) {
                 String estacionPrincipalOtra = estacionesOtras.get(0);
                 WeatherData dato = datosMap.get(estacionPrincipalOtra);
-                if (dato == null) {
+
+                if (dato != null) {
+                    System.out.println("Datos encontrados para Otra: " + estacionPrincipalOtra + " - Temp: " + dato.getTemperatura());
+                    estacionesPrincipales.put(estacionPrincipalOtra, dato);
+                } else {
+                    System.out.println("No se encontraron datos para Otra: " + estacionPrincipalOtra + ", creando datos vacíos");
                     dato = crearDatoVacio(estacionPrincipalOtra);
+                    estacionesPrincipales.put(estacionPrincipalOtra, dato);
                 }
-                estacionesPrincipales.put(estacionPrincipalOtra, dato);
             }
 
             List<String> estacionesOrdenadas = new ArrayList<>();
@@ -112,10 +145,17 @@ public class WeatherController {
 
             Map<String, String> nombresAmigablesEstaciones = new HashMap<>();
 
+            // Procesar todas las estaciones para el reporte
             for (String estacion : estacionesOrdenadas) {
                 WeatherData dato = datosMap.get(estacion);
-                if (dato == null) {
+
+                if (dato != null) {
+                    // Usar los datos reales
+                    System.out.println("Procesando estación con datos reales: " + estacion + " - Temp: " + dato.getTemperatura());
+                } else {
+                    // Solo crear datos vacíos si no hay datos reales
                     dato = crearDatoVacio(estacion);
+                    System.out.println("Creando datos vacíos para: " + estacion);
                 }
 
                 nombresAmigablesEstaciones.put(estacion, obtenerNombreEstacionFormateado(estacion));
@@ -132,6 +172,7 @@ public class WeatherController {
                 }
             }
 
+            // Actualizar nombres amigables para estaciones principales
             for (String estacion : estacionesPrincipales.keySet()) {
                 WeatherData dato = estacionesPrincipales.get(estacion);
                 nombresAmigablesEstaciones.put(estacion, SshService.obtenerNombreAmigable(estacion));
@@ -156,6 +197,12 @@ public class WeatherController {
                 }
             }
 
+            // Debug final
+            System.out.println("Estaciones principales finales:");
+            for (Map.Entry<String, WeatherData> entry : estacionesPrincipales.entrySet()) {
+                System.out.println("  " + entry.getKey() + " -> Temp: " + entry.getValue().getTemperatura());
+            }
+
             model.addAttribute("datosPorEstacion", estacionesPrincipales);
             model.addAttribute("ultimosDatosEstaciones", todosLosDatos);
             model.addAttribute("fechaMin", LocalDate.now().withDayOfMonth(1));
@@ -169,6 +216,7 @@ public class WeatherController {
             System.out.println("Datos por región para Reporte: " + datosPorRegionOrdenado.keySet());
 
         } catch (Exception e) {
+            System.err.println("Error en showPrincipal: " + e.getMessage());
             e.printStackTrace();
             manejarError(model);
         }
@@ -347,9 +395,6 @@ public class WeatherController {
         }
     }
 
-    /**
-     * Obtiene datos de una estación específica en un rango de fechas con validación mejorada
-     */
     @GetMapping("/api/estacion/{estacion}/datos-rango")
     @ResponseBody
     public ResponseEntity<List<WeatherData>> getDatosRangoValidado(
@@ -358,12 +403,10 @@ public class WeatherController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
 
         try {
-            // Validar que la fecha de inicio no sea posterior a la fecha fin
             if (fechaInicio.isAfter(fechaFin)) {
                 return ResponseEntity.badRequest().build();
             }
 
-            // Validar que no se soliciten más de 31 días
             if (fechaInicio.until(fechaFin).getDays() > 31) {
                 return ResponseEntity.badRequest().build();
             }
@@ -502,17 +545,16 @@ public class WeatherController {
         }
     }
 
-
     private WeatherData crearDatoVacio(String estacion) {
         WeatherData dato = new WeatherData();
         dato.setEstacion(estacion);
         dato.setFecha("--");
         dato.setHora("--");
-        dato.setTemperatura(0.0);
-        dato.setPresion(0.0);
-        dato.setHumedad(0.0);
-        dato.setAqi(0);
-        dato.setViento(0.0);
+        dato.setTemperatura(null);
+        dato.setPresion(null);
+        dato.setHumedad(null);
+        dato.setAqi(null);
+        dato.setViento(null);
 
         String[] partes = estacion.split("/");
         if (partes.length >= 1) {
