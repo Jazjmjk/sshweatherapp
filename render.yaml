@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: avispero-app
+    name: sshweather-app
     env: docker
-    repo: https://github.com/Jazjmjk/Avispero
+    repo: https://github.com/Jazjmjk/sshweatherapp
     dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
