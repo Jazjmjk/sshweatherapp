@@ -6,6 +6,7 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -34,12 +35,18 @@ public class SshService {
     @Value("${ssh.remoteBasePath}")
     private String remoteBasePath;
 
+    @Scheduled(fixedRate = 15 * 60 * 1000) 
+    public void limpiarCache() {
+        cacheDatos.clear();
+    }
+
     private static final int SSH_CONNECT_TIMEOUT = 10000;
     private static final int SSH_COMMAND_TIMEOUT = 15000;
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_DELAY_MS = 1000;
 
     private List<WeatherData> cacheDatosEstaciones = new ArrayList<>();
+    private final Map<String, List<WeatherData>> cacheDatos = new ConcurrentHashMap<>();
     private long ultimaActualizacionCache = 0;
     private static final long CACHE_DURATION_MS = 60_000;
 
@@ -425,6 +432,11 @@ public class SshService {
     }
 
     public List<WeatherData> getDatosPorEstacionYRango(String estacion, LocalDate fechaInicio, LocalDate fechaFin) {
+        String cacheKey = estacion + "_" + fechaInicio + "_" + fechaFin;
+        if (cacheDatos.containsKey(cacheKey)) {
+            return cacheDatos.get(cacheKey);
+        }
+
         return executeWithRetry(() -> {
             List<WeatherData> datosRango = new ArrayList<>();
             Session session = null;
@@ -500,6 +512,8 @@ public class SshService {
                         }
                     }
                 }
+
+                cacheDatos.put(cacheKey, datosRango);
 
             } finally {
                 if (session != null && session.isConnected()) {
