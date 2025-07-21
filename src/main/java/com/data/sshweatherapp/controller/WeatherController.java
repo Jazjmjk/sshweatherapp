@@ -29,7 +29,7 @@ public class WeatherController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 300000)
     public void mantenerConexionSSH() {
         sshService.keepAlive();
     }
@@ -37,33 +37,24 @@ public class WeatherController {
     @GetMapping("/")
     public String showPrincipal(Model model) {
         try {
-            List<String> todasLasEstaciones = sshService.getNombreEstaciones();
             List<WeatherData> todosLosDatos = sshService.getUltimosDatosTodasEstaciones();
 
-            System.out.println("Total de estaciones: " + todasLasEstaciones.size());
             System.out.println("Total de datos obtenidos: " + todosLosDatos.size());
 
-            // Debug: Imprimir algunos datos para verificar
-            if (todosLosDatos != null && !todosLosDatos.isEmpty()) {
-                System.out.println("Primeros datos obtenidos:");
-                for (int i = 0; i < Math.min(3, todosLosDatos.size()); i++) {
-                    WeatherData data = todosLosDatos.get(i);
-                    System.out.println("Estación: " + data.getEstacion() +
-                            ", Temp: " + data.getTemperatura() +
-                            ", Presión: " + data.getPresion() +
-                            ", Humedad: " + data.getHumedad());
+            Set<String> todasLasEstaciones = new HashSet<>();
+            for (WeatherData dato : todosLosDatos) {
+                if (dato.getEstacion() != null) {
+                    todasLasEstaciones.add(dato.getEstacion());
                 }
             }
 
             Map<String, List<WeatherData>> datosPorRegion = new LinkedHashMap<>();
             Map<String, String> aqiTextoMap = new HashMap<>();
 
-            // Crear mapa de datos por estación
             Map<String, WeatherData> datosMap = new HashMap<>();
             for (WeatherData data : todosLosDatos) {
                 if (data != null && data.getEstacion() != null) {
                     datosMap.put(data.getEstacion(), data);
-                    System.out.println("Mapeando estación: " + data.getEstacion() + " con temperatura: " + data.getTemperatura());
                 }
             }
 
@@ -71,7 +62,10 @@ public class WeatherController {
             List<String> estacionesKRK = new ArrayList<>();
             List<String> estacionesOtras = new ArrayList<>();
 
-            for (String estacion : todasLasEstaciones) {
+            List<String> listaEstaciones = new ArrayList<>(todasLasEstaciones);
+            Collections.sort(listaEstaciones);
+
+            for (String estacion : listaEstaciones) {
                 if (estacion.startsWith("TGZ/")) {
                     estacionesTGZ.add(estacion);
                 } else if (estacion.startsWith("KRK/")) {
@@ -81,56 +75,24 @@ public class WeatherController {
                 }
             }
 
-            Collections.sort(estacionesTGZ);
-            Collections.sort(estacionesKRK);
-            Collections.sort(estacionesOtras);
-
             Map<String, WeatherData> estacionesPrincipales = new LinkedHashMap<>();
 
-            // Para TGZ
             if (!estacionesTGZ.isEmpty()) {
                 String estacionPrincipalTGZ = estacionesTGZ.get(0);
-                WeatherData dato = datosMap.get(estacionPrincipalTGZ);
-
-                if (dato != null) {
-                    System.out.println("Datos encontrados para TGZ: " + estacionPrincipalTGZ + " - Temp: " + dato.getTemperatura());
-                    estacionesPrincipales.put(estacionPrincipalTGZ, dato);
-                } else {
-                    System.out.println("No se encontraron datos para TGZ: " + estacionPrincipalTGZ + ", creando datos vacíos");
-                    // Solo crear datos vacíos si realmente no hay datos
-                    dato = crearDatoVacio(estacionPrincipalTGZ);
-                    estacionesPrincipales.put(estacionPrincipalTGZ, dato);
-                }
+                WeatherData dato = datosMap.getOrDefault(estacionPrincipalTGZ, crearDatoVacio(estacionPrincipalTGZ));
+                estacionesPrincipales.put(estacionPrincipalTGZ, dato);
             }
 
-            // Para KRK
             if (!estacionesKRK.isEmpty()) {
                 String estacionPrincipalKRK = estacionesKRK.get(0);
-                WeatherData dato = datosMap.get(estacionPrincipalKRK);
-
-                if (dato != null) {
-                    System.out.println("Datos encontrados para KRK: " + estacionPrincipalKRK + " - Temp: " + dato.getTemperatura());
-                    estacionesPrincipales.put(estacionPrincipalKRK, dato);
-                } else {
-                    System.out.println("No se encontraron datos para KRK: " + estacionPrincipalKRK + ", creando datos vacíos");
-                    dato = crearDatoVacio(estacionPrincipalKRK);
-                    estacionesPrincipales.put(estacionPrincipalKRK, dato);
-                }
+                WeatherData dato = datosMap.getOrDefault(estacionPrincipalKRK, crearDatoVacio(estacionPrincipalKRK));
+                estacionesPrincipales.put(estacionPrincipalKRK, dato);
             }
 
-            // Para otras estaciones
             if (!estacionesOtras.isEmpty()) {
                 String estacionPrincipalOtra = estacionesOtras.get(0);
-                WeatherData dato = datosMap.get(estacionPrincipalOtra);
-
-                if (dato != null) {
-                    System.out.println("Datos encontrados para Otra: " + estacionPrincipalOtra + " - Temp: " + dato.getTemperatura());
-                    estacionesPrincipales.put(estacionPrincipalOtra, dato);
-                } else {
-                    System.out.println("No se encontraron datos para Otra: " + estacionPrincipalOtra + ", creando datos vacíos");
-                    dato = crearDatoVacio(estacionPrincipalOtra);
-                    estacionesPrincipales.put(estacionPrincipalOtra, dato);
-                }
+                WeatherData dato = datosMap.getOrDefault(estacionPrincipalOtra, crearDatoVacio(estacionPrincipalOtra));
+                estacionesPrincipales.put(estacionPrincipalOtra, dato);
             }
 
             List<String> estacionesOrdenadas = new ArrayList<>();
@@ -145,43 +107,20 @@ public class WeatherController {
 
             Map<String, String> nombresAmigablesEstaciones = new HashMap<>();
 
-            // Procesar todas las estaciones para el reporte
             for (String estacion : estacionesOrdenadas) {
-                WeatherData dato = datosMap.get(estacion);
-
-                if (dato != null) {
-                    // Usar los datos reales
-                    System.out.println("Procesando estación con datos reales: " + estacion + " - Temp: " + dato.getTemperatura());
-                } else {
-                    // Solo crear datos vacíos si no hay datos reales
-                    dato = crearDatoVacio(estacion);
-                    System.out.println("Creando datos vacíos para: " + estacion);
-                }
-
+                WeatherData dato = datosMap.getOrDefault(estacion, crearDatoVacio(estacion));
                 nombresAmigablesEstaciones.put(estacion, obtenerNombreEstacionFormateado(estacion));
-
-                if (dato.getAqi() != null) {
-                    aqiTextoMap.put(estacion, getTextoAQI(dato.getAqi()));
-                } else {
-                    aqiTextoMap.put(estacion, "--");
-                }
-
+                aqiTextoMap.put(estacion, dato.getAqi() != null ? getTextoAQI(dato.getAqi()) : "--");
                 String region = dato.getRegion();
                 if (region != null && !region.isEmpty()) {
                     datosPorRegion.computeIfAbsent(region, k -> new ArrayList<>()).add(dato);
                 }
             }
 
-            // Actualizar nombres amigables para estaciones principales
             for (String estacion : estacionesPrincipales.keySet()) {
                 WeatherData dato = estacionesPrincipales.get(estacion);
                 nombresAmigablesEstaciones.put(estacion, SshService.obtenerNombreAmigable(estacion));
-
-                if (dato.getAqi() != null) {
-                    aqiTextoMap.put(estacion, getTextoAQI(dato.getAqi()));
-                } else {
-                    aqiTextoMap.put(estacion, "--");
-                }
+                aqiTextoMap.put(estacion, dato.getAqi() != null ? getTextoAQI(dato.getAqi()) : "--");
             }
 
             Map<String, List<WeatherData>> datosPorRegionOrdenado = new LinkedHashMap<>();
@@ -197,12 +136,6 @@ public class WeatherController {
                 }
             }
 
-            // Debug final
-            System.out.println("Estaciones principales finales:");
-            for (Map.Entry<String, WeatherData> entry : estacionesPrincipales.entrySet()) {
-                System.out.println("  " + entry.getKey() + " -> Temp: " + entry.getValue().getTemperatura());
-            }
-
             model.addAttribute("datosPorEstacion", estacionesPrincipales);
             model.addAttribute("ultimosDatosEstaciones", todosLosDatos);
             model.addAttribute("fechaMin", LocalDate.now().withDayOfMonth(1));
@@ -211,9 +144,6 @@ public class WeatherController {
             model.addAttribute("aqiTextoMap", aqiTextoMap);
             model.addAttribute("datosPorRegion", datosPorRegionOrdenado);
             model.addAttribute("nombresAmigables", nombresAmigables);
-
-            System.out.println("Estaciones principales para Inicio: " + estacionesPrincipales.keySet());
-            System.out.println("Datos por región para Reporte: " + datosPorRegionOrdenado.keySet());
 
         } catch (Exception e) {
             System.err.println("Error en showPrincipal: " + e.getMessage());
@@ -275,11 +205,7 @@ public class WeatherController {
         return sshService.getEstacionesConCoordenadas();
     }
 
-    // ========== MÉTODOS ADICIONALES PARA COMPLETAR LA API ==========
 
-    /**
-     * Obtiene la lista de nombres de todas las estaciones
-     */
     @GetMapping("/api/estaciones/nombres")
     @ResponseBody
     public ResponseEntity<List<String>> getNombresEstaciones() {
@@ -295,9 +221,6 @@ public class WeatherController {
         }
     }
 
-    /**
-     * Obtiene el archivo más reciente de una estación específica
-     */
     @GetMapping("/api/estacion/{estacion}/archivo-reciente")
     @ResponseBody
     public ResponseEntity<Map<String, String>> getArchivoReciente(
@@ -325,9 +248,6 @@ public class WeatherController {
         }
     }
 
-    /**
-     * Lee la última línea de un archivo específico
-     */
     @GetMapping("/api/archivo/ultima-linea")
     @ResponseBody
     public ResponseEntity<WeatherData> getUltimaLineaArchivo(@RequestParam String rutaArchivo) {
@@ -346,9 +266,6 @@ public class WeatherController {
         }
     }
 
-    /**
-     * Obtiene los últimos datos de todas las estaciones con validación
-     */
     @GetMapping("/api/estaciones/datos-recientes")
     @ResponseBody
     public ResponseEntity<List<WeatherData>> getUltimosDatosTodasEstaciones() {
@@ -367,9 +284,6 @@ public class WeatherController {
         }
     }
 
-    /**
-     * Endpoint para verificar conectividad SSH
-     */
     @GetMapping("/api/ssh/ping")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verificarConectividad() {
@@ -612,27 +526,16 @@ public class WeatherController {
     }
 
     private String getTextoAQI(Integer aqi) {
-        if (aqi == null) {
-            return "--";
-        }
-
-        if (aqi <= 50) {
-            return "Bueno";
-        } else if (aqi <= 100) {
-            return "Regular";
-        } else {
-            return "Malo";
-        }
+        if (aqi == null) return "--";
+        if (aqi <= 50) return "Bueno";
+        else if (aqi <= 100) return "Regular";
+        else return "Malo";
     }
 
     private String obtenerNombreEstacionFormateado(String estacion) {
-        if (estacion == null || !estacion.contains("/")) {
-            return estacion;
-        }
+        if (estacion == null || !estacion.contains("/")) return estacion;
         String[] partes = estacion.split("/");
-        if (partes.length >= 2) {
-            return partes[0] + " - " + partes[1];
-        }
+        if (partes.length >= 2) return partes[0] + " - " + partes[1];
         return estacion;
     }
 }

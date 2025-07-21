@@ -12,4 +12,4 @@ COPY --from=build /app/target/sshweatherapp-0.0.1-SNAPSHOT.jar app.jar
 ENV PORT=8080
 EXPOSE ${PORT}
 
-ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=$PORT"]
+CMD java -jar app.jar --server.port=${PORT}

@@ -1049,8 +1049,8 @@
 
                     <div class="status-indicator"
                          th:if="${entry.value.fechaHora != null}"
-                         th:text="${entry.value.fechaHora.isAfter(T(java.time.LocalDateTime).now().minusMinutes(30))} ? '● Activa' : '● Inactiva'"
-                         th:classappend="${entry.value.fechaHora.isAfter(T(java.time.LocalDateTime).now().minusMinutes(30))} ? 'status-activa' : 'status-inactiva'">
+                         th:text="${entry.value.fechaHora.isAfter(T(java.time.ZonedDateTime).now(T(java.time.ZoneId).of('America/Mexico_City')).toLocalDateTime().minusMinutes(30))} ? '● Activa' : '● Inactiva'"
+                         th:classappend="${entry.value.fechaHora.isAfter(T(java.time.ZonedDateTime).now(T(java.time.ZoneId).of('America/Mexico_City')).toLocalDateTime().minusMinutes(30))} ? 'status-activa' : 'status-inactiva'">
                     </div>
                     <div class="status-indicator status-inactiva" th:unless="${entry.value.fechaHora != null}">
                         ● Sin datos
@@ -1149,8 +1149,8 @@
 
                     <div class="status-indicator"
                          th:if="${dato.fechaHora != null}"
-                         th:text="${dato.fechaHora.isAfter(T(java.time.LocalDateTime).now().minusMinutes(30))} ? '● Activa' : '● Inactiva'"
-                         th:classappend="${dato.fechaHora.isAfter(T(java.time.LocalDateTime).now().minusMinutes(30))} ? 'status-activa' : 'status-inactiva'">
+                         th:text="${dato.fechaHora.isAfter(T(java.time.ZonedDateTime).now(T(java.time.ZoneId).of('America/Mexico_City')).toLocalDateTime().minusMinutes(30))} ? '● Activa' : '● Inactiva'"
+                         th:classappend="${dato.fechaHora.isAfter(T(java.time.ZonedDateTime).now(T(java.time.ZoneId).of('America/Mexico_City')).toLocalDateTime().minusMinutes(30))} ? 'status-activa' : 'status-inactiva'">
                     </div>
                     <div class="status-indicator status-inactiva" th:unless="${dato.fechaHora != null}">
                         ● Sin datos

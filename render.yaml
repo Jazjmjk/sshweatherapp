@@ -7,3 +7,5 @@ services:
     envVars:
       - key: PORT
         value: 8080
+      - key: JAVA_TOOL_OPTIONS
+        value: -Duser.timezone=America/Mexico_City

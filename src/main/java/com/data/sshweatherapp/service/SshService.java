@@ -34,13 +34,15 @@ public class SshService {
     @Value("${ssh.remoteBasePath}")
     private String remoteBasePath;
 
-    // Configuración de timeouts
-    private static final int SSH_CONNECT_TIMEOUT = 10000; // 10 segundos
-    private static final int SSH_COMMAND_TIMEOUT = 15000; // 15 segundos
+    private static final int SSH_CONNECT_TIMEOUT = 10000;
+    private static final int SSH_COMMAND_TIMEOUT = 15000;
     private static final int MAX_RETRY_ATTEMPTS = 3;
-    private static final long RETRY_DELAY_MS = 1000; // 1 segundo
+    private static final long RETRY_DELAY_MS = 1000;
 
-    // Pool de threads para operaciones SSH
+    private List<WeatherData> cacheDatosEstaciones = new ArrayList<>();
+    private long ultimaActualizacionCache = 0;
+    private static final long CACHE_DURATION_MS = 60_000;
+
     private final ExecutorService executorService = Executors.newFixedThreadPool(5);
 
     private LocalDateTime ajustarFechaHora(String fechaOriginal, String horaOriginal) {
@@ -59,7 +61,6 @@ public class SshService {
         return hora.getMinute() % 15 == 0;
     }
 
-    // Método mejorado para crear sesión SSH con timeouts
     private Session createSshSession() throws Exception {
         JSch jsch = new JSch();
         Session session = jsch.getSession(user, host, 22);
@@ -70,7 +71,6 @@ public class SshService {
         return session;
     }
 
-    // Método para ejecutar comandos SSH con timeout
     private String executeCommand(Session session, String command, int timeoutMs) throws Exception {
         ChannelExec channel = null;
         try {
@@ -86,7 +86,7 @@ public class SshService {
                 long startTime = System.currentTimeMillis();
 
                 while ((line = reader.readLine()) != null) {
-                    // Verificar timeout durante la lectura
+
                     if (System.currentTimeMillis() - startTime > timeoutMs) {
                         throw new Exception("Timeout ejecutando comando: " + command);
                     }
@@ -101,8 +101,6 @@ public class SshService {
             }
         }
     }
-
-    // Método con retry para operaciones SSH
     private <T> T executeWithRetry(Callable<T> operation, String operationName) {
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
             try {
@@ -116,7 +114,7 @@ public class SshService {
                 }
 
                 try {
-                    Thread.sleep(RETRY_DELAY_MS * attempt); // Backoff exponencial
+                    Thread.sleep(RETRY_DELAY_MS * attempt);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     return null;
@@ -134,7 +132,6 @@ public class SshService {
             try {
                 session = createSshSession();
 
-                // Obtener zonas con timeout
                 String cmdZonas = "ls " + remoteBasePath;
                 String zonasResult = executeCommand(session, cmdZonas, SSH_COMMAND_TIMEOUT);
 
@@ -346,6 +343,12 @@ public class SshService {
     }
 
     public List<WeatherData> getUltimosDatosTodasEstaciones() {
+        long ahora = System.currentTimeMillis();
+
+        if (!cacheDatosEstaciones.isEmpty() && (ahora - ultimaActualizacionCache) < CACHE_DURATION_MS) {
+            return cacheDatosEstaciones;
+        }
+
         List<WeatherData> ultimosDatos = new ArrayList<>();
         List<String> estaciones = getNombreEstaciones();
 
@@ -355,29 +358,22 @@ public class SshService {
         }
 
         int mesActual = LocalDate.now().getMonthValue();
-
         List<CompletableFuture<WeatherData>> futures = new ArrayList<>();
 
         for (String estacion : estaciones) {
             CompletableFuture<WeatherData> future = CompletableFuture.supplyAsync(() -> {
                 try {
                     String archivoReciente = getArchivoMasReciente(estacion, mesActual);
-
                     if (archivoReciente == null || archivoReciente.trim().isEmpty()) {
-                        System.out.println("⚠️ No se encontró archivo CSV para estación: " + estacion);
                         return crearDatoVacio(estacion);
                     }
 
                     WeatherData dato = leerUltimaLineaArchivo(archivoReciente);
-                    if (dato == null) {
-                        dato = crearDatoVacio(estacion);
-                    }
-
+                    if (dato == null) dato = crearDatoVacio(estacion);
                     dato.setEstacion(estacion);
+
                     String[] partes = estacion.split("/");
-                    if (partes.length >= 1) {
-                        dato.setRegion(partes[0]);
-                    }
+                    if (partes.length >= 1) dato.setRegion(partes[0]);
 
                     return dato;
 
@@ -392,10 +388,8 @@ public class SshService {
 
         for (CompletableFuture<WeatherData> future : futures) {
             try {
-                WeatherData resultado = future.get(30, TimeUnit.SECONDS); // Timeout de 30 segundos por estación
-                if (resultado != null) {
-                    ultimosDatos.add(resultado);
-                }
+                WeatherData resultado = future.get(30, TimeUnit.SECONDS);
+                if (resultado != null) ultimosDatos.add(resultado);
             } catch (TimeoutException e) {
                 System.err.println("❌ Timeout procesando estación");
                 future.cancel(true);
@@ -404,8 +398,12 @@ public class SshService {
             }
         }
 
+        cacheDatosEstaciones = ultimosDatos;
+        ultimaActualizacionCache = ahora;
+
         return ultimosDatos;
     }
+
 
     private WeatherData crearDatoVacio(String estacion) {
         WeatherData dato = new WeatherData();
