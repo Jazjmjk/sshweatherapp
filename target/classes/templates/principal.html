@@ -1479,82 +1479,96 @@
 </script>
 <script>
     function crearGrafica(canvasId, label, data, titulo, etiquetas) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) {
-            console.error('Canvas no encontrado:', canvasId);
-            return;
-        }
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.error('Canvas no encontrado:', canvasId);
+        return;
+    }
 
-        canvas.width = 400;
-        canvas.height = 300;
+    canvas.width = 400;
+    canvas.height = 300;
 
-        const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
 
-        if (graficasInstancias[canvasId]) {
-            graficasInstancias[canvasId].destroy();
-        }
+    if (graficasInstancias[canvasId]) {
+        graficasInstancias[canvasId].destroy();
+    }
 
-        graficasInstancias[canvasId] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: etiquetas,
-                datasets: [{
-                    label: label,
-                    data: data,
-                    borderColor: '#155fa0',
-                    backgroundColor: 'rgba(21,95,160,0.1)',
-                    tension: 0.1,
-                    fill: false,
-                    spanGaps: false,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: 2,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: titulo,
-                        font: {
-                            size: 14,
-                            weight: 'bold'
-                        }
-                    },
-                    legend: {
-                        display: true,
-                        position: 'top'
+   
+    let yMin = null;
+    let yMax = null;
+
+    if (label.includes("Humedad")) {
+        yMin = 0;
+        yMax = 100;
+    } else if (label.includes("Calidad del Aire")) {
+        yMin = 0;
+        yMax = 250;
+    }
+
+    graficasInstancias[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: etiquetas,
+            datasets: [{
+                label: label,
+                data: data,
+                borderColor: '#155fa0',
+                backgroundColor: 'rgba(21,95,160,0.1)',
+                tension: 0.1,
+                fill: false,
+                spanGaps: false,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            plugins: {
+                title: {
+                    display: true,
+                    text: titulo,
+                    font: {
+                        size: 14,
+                        weight: 'bold'
                     }
                 },
-                scales: {
-                    x: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
                         display: true,
-                        title: {
-                            display: true,
-                            text: 'Tiempo'
-                        },
-                        ticks: {
-                            maxTicksLimit: 6,
-                            maxRotation: 45
-                        }
+                        text: 'Tiempo'
                     },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: label
-                        },
-                        beginAtZero: false
+                    ticks: {
+                        maxTicksLimit: 6,
+                        maxRotation: 45
                     }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: label
+                    },
+                    beginAtZero: false,
+                    min: yMin,
+                    max: yMax
                 }
             }
-        });
+        }
+    });
 
-        console.log('Gráfica creada:', canvasId);
-    }
+    console.log('Gráfica creada:', canvasId);
+}
 
 </script>
 
